@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 from decimal import Decimal
 from core import models
 
-def create_user(user='testuser@example.com', password='testtestuser'):
-    return get_user_model().objects.create_user(user=user, password=password)
+def create_user(email='testuser@example.com', password='testtestuser'):
+    return get_user_model().objects.create_user(email=email, password=password)
 
 class ModelTests(TestCase):
     """Tests Model"""
@@ -65,6 +65,6 @@ class ModelTests(TestCase):
     
     def test_create_tag(self):
         user = create_user()
-        tag = models.Tag.objects.create(user=user, tag='tag1')
+        tag = models.Tag.objects.create(user=user, name='tag1')
         
         self.assertEqual(str(tag), tag.name)

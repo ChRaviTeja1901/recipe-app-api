@@ -133,4 +133,5 @@ class PrivateRecipeAPITests(TestCase):
         res = self.client.patch(url,payload)
         
         recipe.refresh_from_db()
-        self.assertEqual(res.user, self.user)
+        self.assertEqual(recipe.user, self.user)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
