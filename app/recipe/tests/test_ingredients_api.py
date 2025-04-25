@@ -12,26 +12,8 @@ INGREDIENTS_URL = reverse('recipe:ingredient-list')
 def create_user(email='testuser1@gmail.com', password='testtestuser'):
     return get_user_model().objects.create_user(email=email, password=password)
 
-def create_recipe(user, **params):
-    default = {
-        'title' : 'Sample Recipe Name',
-        'time_minutes' : 5,
-        'price' : Decimal('5.50'),
-        'description' : 'Sample Recipe Description',
-        'link': 'https://example.com/recipe.pdf',
-    }
-    
-    default.update(params)
-    
-    recipe = Recipe.objects.create(user=user, **default)
-    
-    tag, _ = Tag.objects.get_or_create(user=user, name='Indian')
-    recipe.tags.add(tag)
-    
-    return recipe
-
-def detail_url(recipe_id):
-    return reverse('recipe:recipe-detail', args=[recipe_id])
+def detail_url(ingredient_id):
+    return reverse('recipe:ingredient-detail', args=[ingredient_id])
 
 class PublicIngredientsApiTests(TestCase):
     
@@ -49,7 +31,6 @@ class PrivateIngredientsApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = create_user()
-        self.recipe = create_recipe(user=self.user)
         
         self.client.force_authenticate(self.user)
     
@@ -74,17 +55,28 @@ class PrivateIngredientsApiTests(TestCase):
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0]['name'], ingredient.name)
         self.assertEqual(res.data[0]['id'], ingredient.id)
-        
     
-    def test_retrive_ingredients_with_recipe(self):
-        ingredient1 = Ingredient.objects.create(user=self.user, name='Flour')
-        ingredient2 = Ingredient.objects.create(user=self.user, name='Sugar')
-        IngredientQuantity.objects.create(recipe = self.recipe, ingredient = ingredient1, quantity = '1 tbsp')
-        IngredientQuantity.objects.create(recipe = self.recipe, ingredient = ingredient2, quantity = '2 sp')
+    def test_update_ingredient(self):
+        ingredient = Ingredient.objects.create(user=self.user, name='Flour')
         
-        url = detail_url(recipe_id=self.recipe.id)
-        res = self.client.get(url)
+        payload = {'name': 'sugar'}
+        url = detail_url(ingredient_id=ingredient.id)
+        res = self.client.patch(url, payload)
         
-        serializer = RecipeDetailSerializer(self.recipe)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        ingredient.refresh_from_db()
+        self.assertEqual(ingredient.name, payload['name'])
         
-        self.assertEqual(res.data, serializer.data)
+    def test_delete_ingredient(self):
+        ingredient = Ingredient.objects.create(user=self.user, name='Flour')
+        Ingredient.objects.create(user=self.user, name='Sugar')
+        Ingredient.objects.create(user=self.user, name='Salt')
+        
+        url = detail_url(ingredient_id=ingredient.id)
+        res = self.client.delete(url)
+        
+        ingredients = Ingredient.objects.filter(user=self.user)
+        serializer = IngredientSerializer(ingredients, many=True)
+        
+        self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertNotIn(ingredient.name, serializer.data)

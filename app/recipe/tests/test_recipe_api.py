@@ -9,10 +9,17 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from core.models import Recipe, Tag
+from core.models import Recipe, Tag, Ingredient, IngredientQuantity
 from recipe.serializers import RecipeSerializer, RecipeDetailSerializer
 
+import tempfile
+import os
+from PIL import Image
+
 RECIPES_URL = reverse('recipe:recipe-list')
+
+def image_upload_url(recipe_id):
+    return reverse('recipe:recipe-upload-image', args=[recipe_id])
 
 def create_recipe(user, **params):
     default = {
@@ -214,3 +221,74 @@ class PrivateRecipeAPITests(TestCase):
         
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertNotIn(tag_indian, recipe.tags.all())
+    
+    def test_create_and_update_recipe_with_ingredients(self):
+        # Create Recipe
+        payload_create = {
+            "title": "Fruit Salad",
+            "time_minutes": 5,
+            "price": 10.00,
+            "ingredients": [
+                {"name": "Apple"},
+                {"name": "Banana"},
+            ]
+        }
+
+        res = self.client.post(RECIPES_URL, payload_create, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        recipe_id = res.data['id']
+
+        # Update Recipe: change Banana to Mango
+        url = detail_url(recipe_id=recipe_id)
+        payload_update = {
+            "ingredients": [
+                {"name": "Apple"},
+                {"name": "Mango"}
+            ]
+        }
+
+        res = self.client.patch(url, payload_update, format='json')
+        self.assertEqual(res.status_code, 200)
+        recipe = Recipe.objects.get(id=recipe_id)
+        self.assertEqual(recipe.ingredients.count(), 3)
+        
+        
+    def test_create_and_update_recipe_with_ingredients(self):
+        ingredient = Ingredient.objects.create(user=self.user, name='Mango')
+        recipe = create_recipe(user=self.user)
+        url = detail_url(recipe_id=recipe.id)
+        recipe.ingredients.add(ingredient)
+        payload_update = {"ingredients": []}
+
+        res = self.client.patch(url, payload_update, format='json')
+        self.assertEqual(res.status_code, 200)
+        recipe = Recipe.objects.get(id=recipe.id)
+        self.assertEqual(recipe.ingredients.count(), 0)
+
+class ImageUploadTests(TestCase):
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user = get_user_model().objects.create_user(
+            'usertest@gmail.com',
+            'testtestuser'
+        )
+        self.client.force_authenticate(self.user)
+        self.recipe = create_recipe(user=self.user)
+        
+    def tearDown(self):
+        self.recipe.image.delete()
+        
+    
+    def test_upload_image(self):
+        url = image_upload_url(recipe_id=self.recipe.id)
+        with tempfile.NamedTemporaryFile(suffix='.jpg') as image_file:
+            img = Image.new('RGB', (10,10))
+            img.save(image_file, format='JPEG')
+            image_file.seek(0)
+            payload = {'image': image_file}
+            res = self.client.post(url, payload, format='multipart')
+        self.recipe.refresh_from_db()
+        self.assertEqual(res.status_code,status.HTTP_200_OK)
+        self.assertIn('image', res.data)
+        self.assertTrue(os.path.exists(self.recipe.image.path))
