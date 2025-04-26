@@ -1,7 +1,7 @@
 """Serializers for recipe API"""
 
 from rest_framework import serializers
-from core.models import Recipe, Tag, Ingredient, IngredientQuantity
+from core.models import Recipe, Tag, Ingredient
 from django.contrib.auth import get_user_model
 
 class TagSerializer(serializers.ModelSerializer):
@@ -17,13 +17,6 @@ class IngredientSerializer(serializers.ModelSerializer):
         model = Ingredient
         fields = ['id', 'name']
         read_only_fields = ['id']
-
-class IngredientQuantitySerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source='ingredient.name')
-
-    class Meta:
-        model = IngredientQuantity
-        fields = ['id', 'name', 'quantity']
 
 class RecipeSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, required=False)

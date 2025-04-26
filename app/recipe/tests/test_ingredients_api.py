@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.test import TestCase
-from core.models import Recipe, Tag, Ingredient, IngredientQuantity
+from core.models import Recipe, Tag, Ingredient
 from rest_framework import status
 from rest_framework.test import APIClient
 from decimal import Decimal
@@ -80,3 +80,21 @@ class PrivateIngredientsApiTests(TestCase):
         
         self.assertEqual(res.status_code, status.HTTP_204_NO_CONTENT)
         self.assertNotIn(ingredient.name, serializer.data)
+    
+    def test_delete_ingredient(self):
+        ingredient1 = Ingredient.objects.create(user=self.user, name='Flour')
+        ingredient2 = Ingredient.objects.create(user=self.user, name='Rice Flour')
+        recipe = Recipe.objects.create(
+            title='Roti',
+            time_minutes=10,
+            price=Decimal('5.99'),
+            user = self.user
+        )
+        recipe.ingredients.add(ingredient1)
+        
+        res = self.client.get(INGREDIENTS_URL, {'assinged_only': 1})
+        
+        s1 = IngredientSerializer(ingredient1)
+        s2 = IngredientSerializer(ingredient2)
+        self.assertIn(s1.data, res.data)
+        self.assertNotIn(s2.data, res.data)
